@@ -2,6 +2,7 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
 #include "include/types.h"
 #include "include/notify.h"
 
@@ -9,7 +10,8 @@ static struct callback_function_collection callbacks = {
     .create = NULL,
     .remove = NULL,
     .modify = NULL,
-    .rename = NULL
+    .moved_from = NULL,
+    .moved_to = NULL
 };
 
 static int inotify_fd = -1;
@@ -33,7 +35,14 @@ int add_watch(const char* filepath, int flags) {
     int watch = inotify_add_watch(inotify_fd, filepath, flags);
 
     if (watch < 0) {
-        return -1;
+        switch (errno) {
+            case ENOENT:
+                return -1;
+            case EACCES:
+                return -2;
+            default:
+                return -3;
+        }
     }
 
     return watch;
@@ -43,7 +52,7 @@ int remove_watch(int watch) {
     return inotify_rm_watch(inotify_fd, watch);
 }
 
-int set_callback(void (*callback)(const char*), int flag) {
+int set_callback(void (*callback)(const char*, int), int flag) {
     switch (flag) {
         case IN_CREATE:
             callbacks.create = callback;
@@ -61,8 +70,19 @@ int set_callback(void (*callback)(const char*), int flag) {
     return 0;
 }
 
-void set_move_callback(void (*callback)(const char*, const char*)) {
-    callbacks.rename = callback;
+int set_move_callback(void (*callback)(const char*, int, int), int flag) {
+    switch (flag) {
+        case IN_MOVED_FROM:
+            callbacks.moved_from = callback;
+            break;
+        case IN_MOVED_TO:
+            callbacks.moved_to = callback;
+            break;
+        default:
+            return -1;
+    }
+
+    return 0;
 }
 
 static void* handle_events(void* _vargp) {
@@ -82,15 +102,15 @@ static void* handle_events(void* _vargp) {
             struct inotify_event* event = (struct inotify_event*) ptr;
 
             if (event->mask & IN_CREATE && callbacks.create) {
-                callbacks.create(event->name);
+                callbacks.create(event->name, event->wd);
             } else if (event->mask & IN_DELETE && callbacks.remove) {
-                callbacks.remove(event->name);
+                callbacks.remove(event->name, event->wd);
             } else if (event->mask & IN_MODIFY && callbacks.modify) {
-                callbacks.modify(event->name);
-            } else if (event->mask & IN_MOVED_FROM && callbacks.rename) {
-                // cookie_map[event->cookie] = event->name;
-            } else if (event->mask & IN_MOVED_TO && callbacks.rename) {
-                // callbacks.rename(cookie_map[event->cookie], event->name);
+                callbacks.modify(event->name, event->wd);
+            } else if (event->mask & IN_MOVED_FROM && callbacks.moved_from) {
+                callbacks.moved_from(event->name, event->cookie, event->wd);
+            } else if (event->mask & IN_MOVED_TO && callbacks.moved_to) {
+                callbacks.moved_to(event->name, event->cookie, event->wd);
             }
 
             ptr += sizeof(struct inotify_event) + event->len;

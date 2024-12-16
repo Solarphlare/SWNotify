@@ -2,6 +2,8 @@ import Foundation
 import CNotify
 
 public enum NotifierError: Error {
+    case noSuchFileOrDirectory
+    case accessDenied
     case failedToAddNotifier
     case failedToRemoveNotifier
 }
@@ -10,48 +12,47 @@ public enum FileSystemEvent: Int32 {
     case create = 0x0100
     case delete = 0x0200
     case modify = 0x0002
-    case rename = 0x00C0
+    case move = 0x00C0
 }
 
 public class Notifier {
     private static let _default = Notifier()
     private var watches: [String: Int32] = [:]
+    private var watchesReversed: [Int32: String] = [:]
 
     private var createCallbacks: [UUID : (String) -> Void] = [:]
     private var deleteCallbacks: [UUID : (String) -> Void] = [:]
     private var modifyCallbacks: [UUID : (String) -> Void] = [:]
     private var moveCallbacks: [UUID : (String, String) -> Void] = [:]
 
-    private let onFileCreated: @convention(c) (UnsafePointer<CChar>?) -> Void = { filepath in
-        guard let filepath else {
-            return
-        }
+    private var cookies: [Int32: String] = [:]
 
-        _default.createCallbacks.values.forEach { $0(String(cString: filepath)) }
+    private let onFileCreated: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
+       let filepath = _default.watchesReversed[wd]! + "/" +  String(cString: filename!)
+        _default.createCallbacks.values.forEach { $0(filepath) }
     }
 
-    private let onFileDeleted: @convention(c) (UnsafePointer<CChar>?) -> Void = { filepath in
-        guard let filepath else {
-            return
-        }
-
-        _default.deleteCallbacks.values.forEach { $0(String(cString: filepath)) }
+    private let onFileDeleted: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        _default.deleteCallbacks.values.forEach { $0(filepath) }
     }
 
-    private let onFileModified: @convention(c) (UnsafePointer<CChar>?) -> Void = { filepath in
-        guard let filepath else {
-            return
-        }
-
-        _default.modifyCallbacks.values.forEach { $0(String(cString: filepath)) }
+    private let onFileModified: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        _default.modifyCallbacks.values.forEach { $0(filepath) }
     }
 
-    private let onFileMoved: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void = { oldFilepath, newFilepath in
-        guard let oldFilepath, let newFilepath else {
-            return
-        }
+    private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        _default.cookies[cookie] = filepath
+    }
 
-        _default.moveCallbacks.values.forEach { $0(String(cString: oldFilepath), String(cString: newFilepath)) }
+    private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let oldPath = _default.cookies[cookie]!
+
+        _default.cookies.removeValue(forKey: cookie)
+        _default.moveCallbacks.values.forEach { $0(oldPath, filepath) }
     }
 
     /// The default notifier instance. Use this to interact with the notifier.
@@ -70,7 +71,8 @@ public class Notifier {
             set_callback(onFileCreated, FileSystemEvent.create.rawValue)
             set_callback(onFileDeleted, FileSystemEvent.delete.rawValue)
             set_callback(onFileModified, FileSystemEvent.modify.rawValue)
-            set_move_callback(onFileMoved)
+            set_move_callback(onFileMovedFrom, 0x0040)
+            set_move_callback(onFileMovedTo, 0x0080)
 
             start_notifier()
         }
@@ -85,11 +87,19 @@ public class Notifier {
         let eventMask = events.reduce(0) { $0 | $1.rawValue }
         let watchId = add_watch(path, eventMask);
 
-        guard watchId != -1 else {
-            throw NotifierError.failedToAddNotifier
+        guard watchId >= 0 else {
+            switch watchId {
+            case -1:
+                throw NotifierError.noSuchFileOrDirectory
+            case -2:
+                throw NotifierError.accessDenied
+            default:
+                throw NotifierError.failedToAddNotifier
+            }
         }
 
         self.watches[path] = watchId
+        self.watchesReversed[watchId] = path
     }
 
     /// Remove a notifier for a given path.
@@ -106,6 +116,7 @@ public class Notifier {
         }
 
         self.watches.removeValue(forKey: path)
+        self.watchesReversed.removeValue(forKey: watchId)
     }
 
     /// Add a callback to be called when a file is created.
