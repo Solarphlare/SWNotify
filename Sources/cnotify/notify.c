@@ -3,16 +3,15 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
-#include "include/types.h"
 #include "include/notify.h"
 
-static struct callback_function_collection callbacks = {
-    .create = NULL,
-    .remove = NULL,
-    .modify = NULL,
-    .moved_from = NULL,
-    .moved_to = NULL
-};
+struct {
+    void (*create)(const char*, int);
+    void (*remove)(const char*, int);
+    void (*modify)(const char*, int);
+    void (*moved_from)(const char*, int, int);
+    void (*moved_to)(const char*, int, int);
+} callbacks = {NULL, NULL, NULL, NULL, NULL};
 
 static int inotify_fd = -1;
 static int initialized = 0;
