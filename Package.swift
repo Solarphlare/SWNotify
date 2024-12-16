@@ -9,7 +9,8 @@ let package = Package(
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "SWNotify",
-            targets: ["SWNotify", "CNotify"]),
+            targets: ["SWNotify", "CNotify"]
+        ),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -24,5 +25,6 @@ let package = Package(
             dependencies: ["CNotify"]
         )
     ],
-    swiftLanguageModes: [.v5]
+    swiftLanguageModes: [.v5],
+    cLanguageStandard: .c18
 )
