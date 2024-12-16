@@ -13,19 +13,22 @@ public enum FileSystemEvent: Int32 {
     case create = 0x0100
     case delete = 0x0200
     case modify = 0x0002
-    case move = 0x00C0
+    case moveFrom = 0x0040
+    case moveTo = 0x0080
+    case rename = 0x00C0
 }
 
 public class Notifier {
     private static let _default = Notifier()
     private var watches: [String: Int32] = [:]
     private var watchesReversed: [Int32: String] = [:]
-    private var cookies: [Int32: String] = [:]
 
     private var createCallbacks: [UUID : (String) -> Void] = [:]
     private var deleteCallbacks: [UUID : (String) -> Void] = [:]
     private var modifyCallbacks: [UUID : (String) -> Void] = [:]
-    private var moveCallbacks: [UUID : (String?, String?) -> Void] = [:]
+    private var moveFromCallbacks: [UUID : (String) -> Void] = [:]
+    private var moveToCallbacks: [UUID : (String) -> Void] = [:]
+    private var renameCallbacks: [UUID : (String, String) -> Void] = [:]
 
 
     private let onFileCreated: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
@@ -43,18 +46,20 @@ public class Notifier {
         _default.modifyCallbacks.values.forEach { $0(filepath) }
     }
 
-    private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
+    private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
         let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
-        _default.cookies[cookie] = filepath
-        _default.moveCallbacks.values.forEach { $0(filepath, nil) }
+        _default.moveFromCallbacks.values.forEach { $0(filepath) }
     }
 
-    private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
+    private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
         let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
-        let oldPath = _default.cookies[cookie]
+        _default.moveToCallbacks.values.forEach { $0(filepath) }
+    }
 
-        _default.cookies.removeValue(forKey: cookie)
-        _default.moveCallbacks.values.forEach { $0(oldPath, filepath) }
+    private let onFileRenamed: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> Void = { oldFilename, newFilename, wd in
+        let oldFilepath = _default.watchesReversed[wd]! + "/" + String(cString: oldFilename!)
+        let newFilepath = _default.watchesReversed[wd]! + "/" + String(cString: newFilename!)
+        _default.renameCallbacks.values.forEach { $0(oldFilepath, newFilepath) }
     }
 
     /// The default notifier instance. Use this to interact with the notifier.
@@ -73,8 +78,8 @@ public class Notifier {
             set_callback(onFileCreated, FileSystemEvent.create.rawValue)
             set_callback(onFileDeleted, FileSystemEvent.delete.rawValue)
             set_callback(onFileModified, FileSystemEvent.modify.rawValue)
-            set_move_callback(onFileMovedFrom, 0x0040)
-            set_move_callback(onFileMovedTo, 0x0080)
+            set_callback(onFileMovedFrom, 0x0040)
+            set_callback(onFileMovedTo, 0x0080)
 
             start_notifier()
         }
@@ -166,17 +171,37 @@ public class Notifier {
 
     /// Add a callback to be called when a file is moved.
     /// - Parameters:
-    /// callback: The callback to be called when a file is moved. The callback takes the old path and the new path of the moved file as arguments.
-    /// Either of the paramaters may be `nil` (but not both at the same time).
+    /// callback: The callback to be called when a file is moved from a watched directory. The callback takes the old path of the file as an argument.
     /// - Returns: A `UUID` that can be used to remove the callback.
     /// - Discussion:
-    /// This callback may be called twice depending on the specifics of the move operation. If a file is moved into a watched directory, the callback will be called with the old path as `nil`.
-    /// If a file is moved out of a watched directory, the callback will be called with the new path as `nil`.
-    /// If a file is moved within a watched directory, the callback will be called twice, once with the new path as `nil`, and again with both paths non-`nil`.
     @discardableResult
-    public func addOnFileMoveCallback(_ callback: @escaping (String?, String?) -> Void) -> UUID {
+    public func addOnFileMoveFromCallback(_ callback: @escaping (String) -> Void) -> UUID {
         let callbackIdentifier = UUID()
-        self.moveCallbacks[callbackIdentifier] = callback
+        self.moveFromCallbacks[callbackIdentifier] = callback
+
+        return callbackIdentifier
+    }
+
+    /// Add a callback to be called when a file is moved to a watched directory.
+    /// - Parameters:
+    /// callback: The callback to be called when a file is moved to a watched directory. The callback takes the new path of the file as an argument.
+    /// - Returns: A `UUID` that can be used to remove the callback.
+    @discardableResult
+    public func addOnFileMoveToCallback(_ callback: @escaping (String) -> Void) -> UUID {
+        let callbackIdentifier = UUID()
+        self.moveToCallbacks[callbackIdentifier] = callback
+
+        return callbackIdentifier
+    }
+
+    /// Add a callback to be called when a file is renamed.
+    /// - Parameters:
+    /// callback: The callback to be called when a file is renamed. The callback takes the old path and the new path of the file as arguments.
+    /// - Returns: A `UUID` that can be used to remove the callback.
+    @discardableResult
+    public func addOnFileRenameCallback(_ callback: @escaping (String, String) -> Void) -> UUID {
+        let callbackIdentifier = UUID()
+        self.renameCallbacks[callbackIdentifier] = callback
 
         return callbackIdentifier
     }
@@ -185,6 +210,8 @@ public class Notifier {
         self.createCallbacks.removeValue(forKey: identifier)
         self.deleteCallbacks.removeValue(forKey: identifier)
         self.modifyCallbacks.removeValue(forKey: identifier)
-        self.moveCallbacks.removeValue(forKey: identifier)
+        self.moveFromCallbacks.removeValue(forKey: identifier)
+        self.moveToCallbacks.removeValue(forKey: identifier)
+        self.renameCallbacks.removeValue(forKey: identifier)
     }
 }

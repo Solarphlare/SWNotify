@@ -4,14 +4,17 @@
 #include <pthread.h>
 #include <errno.h>
 #include "include/notify.h"
+#include "include/types.h"
+#include "include/moveevents.h"
 
-struct {
-    void (*create)(const char*, int);
-    void (*remove)(const char*, int);
-    void (*modify)(const char*, int);
-    void (*moved_from)(const char*, int, int);
-    void (*moved_to)(const char*, int, int);
-} callbacks = {NULL, NULL, NULL, NULL, NULL};
+struct callback_collection callbacks = {
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
 
 static int inotify_fd = -1;
 static int initialized = 0;
@@ -62,6 +65,12 @@ int set_callback(void (*callback)(const char*, int), int flag) {
         case IN_MODIFY:
             callbacks.modify = callback;
             break;
+        case IN_MOVED_FROM:
+            callbacks.move_from = callback;
+            break;
+        case IN_MOVED_TO:
+            callbacks.move_to = callback;
+            break;
         default:
             return -1;
     }
@@ -69,18 +78,8 @@ int set_callback(void (*callback)(const char*, int), int flag) {
     return 0;
 }
 
-int set_move_callback(void (*callback)(const char*, int, int), int flag) {
-    switch (flag) {
-        case IN_MOVED_FROM:
-            callbacks.moved_from = callback;
-            break;
-        case IN_MOVED_TO:
-            callbacks.moved_to = callback;
-            break;
-        default:
-            return -1;
-    }
-
+int set_rename_callback(void (*callback)(const char*, const char*, int)) {
+    callbacks.rename = callback;
     return 0;
 }
 
@@ -102,17 +101,37 @@ static void* handle_events(void* _vargp) {
 
             if (event->mask & IN_CREATE && callbacks.create) {
                 callbacks.create(event->name, event->wd);
-            } else if (event->mask & IN_DELETE && callbacks.remove) {
+            }
+            else if (event->mask & IN_DELETE && callbacks.remove) {
                 callbacks.remove(event->name, event->wd);
-            } else if (event->mask & IN_MODIFY && callbacks.modify) {
+            }
+            else if (event->mask & IN_MODIFY && callbacks.modify) {
                 callbacks.modify(event->name, event->wd);
-            } else if (event->mask & IN_MOVED_FROM && callbacks.moved_from) {
-                callbacks.moved_from(event->name, event->cookie, event->wd);
-            } else if (event->mask & IN_MOVED_TO && callbacks.moved_to) {
-                callbacks.moved_to(event->name, event->cookie, event->wd);
+            }
+            else if (event->mask & IN_MOVED_FROM) {
+                track_event(event->wd, event->cookie, event->name);
+            }
+            else if (event->mask & IN_MOVED_TO) {
+                char matched_name[1024];
+                if (find_and_remove_event(event->cookie, matched_name)) {
+                    if (callbacks.rename) {
+                        callbacks.rename(matched_name, event->name, event->wd);
+                    }
+                }
+                else if (callbacks.move_to) {
+                    callbacks.move_to(event->name, event->wd);
+                }
             }
 
             ptr += sizeof(struct inotify_event) + event->len;
+        }
+
+        time_t now = time(NULL);
+        for (int i = 0; i < tracked_count; i++) {
+            if (now - tracked_events[i].timestamp > 1 && callbacks.move_from) {
+                callbacks.move_from(tracked_events[i].name, tracked_events[i].wd);
+                find_and_remove_event(tracked_events[i].cookie, NULL);
+            }
         }
     }
 
