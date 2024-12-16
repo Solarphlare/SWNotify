@@ -1,4 +1,4 @@
-#include <sys/inotify.h>
+#pragma once
 
 int notifier_init();
 int add_watch(const char* filepath, int flags);
