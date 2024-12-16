@@ -25,7 +25,7 @@ public class Notifier {
     private var createCallbacks: [UUID : (String) -> Void] = [:]
     private var deleteCallbacks: [UUID : (String) -> Void] = [:]
     private var modifyCallbacks: [UUID : (String) -> Void] = [:]
-    private var moveCallbacks: [UUID : (String, String?) -> Void] = [:]
+    private var moveCallbacks: [UUID : (String?, String?) -> Void] = [:]
 
 
     private let onFileCreated: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
@@ -55,7 +55,7 @@ public class Notifier {
     private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
         let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
         let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
-        let oldPath = _default.cookies[cookie]!
+        let oldPath = _default.cookies[cookie]
 
         _default.cookies.removeValue(forKey: cookie)
         _default.moveCallbacks.values.forEach { $0(oldPath, filepath) }
@@ -171,11 +171,10 @@ public class Notifier {
     /// Add a callback to be called when a file is moved.
     /// - Parameters:
     /// callback: The callback to be called when a file is moved. The callback takes the old path and the new path of the moved file as arguments.
-    /// This event is called twice if the file is moved within the watch directory. The parameter for the new path will be nil for the first call,
-    /// and the new path of the file for the second call. If the file is moved outside the watch directory, the callback will only be called once, with the new path as nil.
+    /// Either of the paths can be nil depending on the specifics of the move operation.
     /// - Returns: A UUID that can be used to remove the callback.
     @discardableResult
-    public func addOnFileMoveCallback(_ callback: @escaping (String, String?) -> Void) -> UUID {
+    public func addOnFileMoveCallback(_ callback: @escaping (String?, String?) -> Void) -> UUID {
         let callbackIdentifier = UUID()
         self.moveCallbacks[callbackIdentifier] = callback
 
