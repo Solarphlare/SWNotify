@@ -4,6 +4,7 @@ import CNotify
 public enum NotifierError: Error {
     case noSuchFileOrDirectory
     case accessDenied
+    case invalidTarget
     case failedToAddNotifier
     case failedToRemoveNotifier
 }
@@ -20,7 +21,6 @@ public class Notifier {
     private var watches: [String: Int32] = [:]
     private var watchesReversed: [Int32: String] = [:]
     private var cookies: [Int32: String] = [:]
-    private var individualFileWatches: [Int32] = []
 
     private var createCallbacks: [UUID : (String) -> Void] = [:]
     private var deleteCallbacks: [UUID : (String) -> Void] = [:]
@@ -34,27 +34,23 @@ public class Notifier {
     }
 
     private let onFileDeleted: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-    let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
-        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
         _default.deleteCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileModified: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
-        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
         _default.modifyCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
-        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
-        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
         _default.cookies[cookie] = filepath
         _default.moveCallbacks.values.forEach { $0(filepath, nil) }
     }
 
     private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
-        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
-        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
+        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
         let oldPath = _default.cookies[cookie]
 
         _default.cookies.removeValue(forKey: cookie)
@@ -111,7 +107,7 @@ public class Notifier {
         let _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
 
         if (!isDirectory) {
-            self.individualFileWatches.append(watchId)
+            throw NotifierError.invalidTarget
         }
     }
 
