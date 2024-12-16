@@ -19,13 +19,14 @@ public class Notifier {
     private static let _default = Notifier()
     private var watches: [String: Int32] = [:]
     private var watchesReversed: [Int32: String] = [:]
+    private var cookies: [Int32: String] = [:]
+    private var individualFileWatches: [Int32] = []
 
     private var createCallbacks: [UUID : (String) -> Void] = [:]
     private var deleteCallbacks: [UUID : (String) -> Void] = [:]
     private var modifyCallbacks: [UUID : (String) -> Void] = [:]
     private var moveCallbacks: [UUID : (String, String) -> Void] = [:]
 
-    private var cookies: [Int32: String] = [:]
 
     private let onFileCreated: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
        let filepath = _default.watchesReversed[wd]! + "/" +  String(cString: filename!)
@@ -33,22 +34,26 @@ public class Notifier {
     }
 
     private let onFileDeleted: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+    let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
+        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
         _default.deleteCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileModified: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
+        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
         _default.modifyCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
+        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
         _default.cookies[cookie] = filepath
     }
 
     private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32, Int32) -> Void = { filename, cookie, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let isWatchingIndividualFile = _default.individualFileWatches.contains(wd)
+        let filepath = _default.watchesReversed[wd]! + (isWatchingIndividualFile ? "" : "/" + String(cString: filename!))
         let oldPath = _default.cookies[cookie]!
 
         _default.cookies.removeValue(forKey: cookie)
@@ -100,6 +105,13 @@ public class Notifier {
 
         self.watches[path] = watchId
         self.watchesReversed[watchId] = path
+
+        var isDirectory = false
+        let _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+
+        if (!isDirectory) {
+            self.individualFileWatches.append(watchId)
+        }
     }
 
     /// Remove a notifier for a given path.
