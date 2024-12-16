@@ -171,8 +171,12 @@ public class Notifier {
     /// Add a callback to be called when a file is moved.
     /// - Parameters:
     /// callback: The callback to be called when a file is moved. The callback takes the old path and the new path of the moved file as arguments.
-    /// Either of the paths can be nil depending on the specifics of the move operation.
-    /// - Returns: A UUID that can be used to remove the callback.
+    /// Either of the paramaters may be `nil` (but not both at the same time).
+    /// - Returns: A `UUID` that can be used to remove the callback.
+    /// - Discussion:
+    /// This callback may be called twice depending on the specifics of the move operation. If a file is moved into a watched directory, the callback will be called with the old path as `nil`.
+    /// If a file is moved out of a watched directory, the callback will be called with the new path as `nil`.
+    /// If a file is moved within a watched directory, the callback will be called twice, once with the new path as `nil`, and again with both paths non-`nil`.
     @discardableResult
     public func addOnFileMoveCallback(_ callback: @escaping (String?, String?) -> Void) -> UUID {
         let callbackIdentifier = UUID()
