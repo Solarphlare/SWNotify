@@ -1,6 +1,5 @@
 #pragma once
 #include <stdint.h>
-#include <time.h>
 
 struct callback_collection {
     // const char* name, int wd
@@ -16,6 +15,6 @@ struct callback_collection {
 struct move_event {
     uint32_t cookie;
     char name[1024];
-    time_t timestamp;
+    long long timestamp;
     uint32_t wd;
 };

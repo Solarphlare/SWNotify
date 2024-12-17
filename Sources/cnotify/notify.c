@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/poll.h>
+#include "include/util.h"
 #include "include/notify.h"
 #include "include/types.h"
 #include "include/moveevents.h"
@@ -88,8 +90,29 @@ static void* handle_events(void* _vargp) {
 
     char buf[4096];
     ssize_t length;
+    struct pollfd fds[1];
+
+    fds[0].fd = inotify_fd;
+    fds[0].events = POLLIN;
 
     while (1) {
+        int ret = poll(fds, 1, 250);
+
+        if (ret < 0) {
+            break;
+        }
+        else if (ret == 0) {
+            long long now = get_current_time_millis();
+            for (int i = 0; i < tracked_count; i++) {
+                if (now - tracked_events[i].timestamp > 500 && callbacks.move_from) {
+                    callbacks.move_from(tracked_events[i].name, tracked_events[i].wd);
+                    find_and_remove_event(tracked_events[i].cookie, NULL);
+                }
+            }
+
+            continue;
+        }
+
         length = read(inotify_fd, buf, sizeof(buf));
 
         if (length < 0) {
@@ -124,14 +147,6 @@ static void* handle_events(void* _vargp) {
             }
 
             ptr += sizeof(struct inotify_event) + event->len;
-        }
-
-        time_t now = time(NULL);
-        for (int i = 0; i < tracked_count; i++) {
-            if (now - tracked_events[i].timestamp > 1 && callbacks.move_from) {
-                callbacks.move_from(tracked_events[i].name, tracked_events[i].wd);
-                find_and_remove_event(tracked_events[i].cookie, NULL);
-            }
         }
     }
 

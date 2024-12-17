@@ -1,4 +1,5 @@
 #include "include/moveevents.h"
+#include "util.h"
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -15,7 +16,7 @@ void track_event(uint32_t wd, uint32_t cookie, const char* name) {
     event->cookie = cookie;
     event->wd = wd;
     strncpy(event->name, name, sizeof(event->name));
-    event->timestamp = time(NULL);
+    event->timestamp = get_current_time_millis();
     tracked_count++;
 }
 
