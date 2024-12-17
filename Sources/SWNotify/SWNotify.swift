@@ -80,6 +80,7 @@ public class Notifier {
             set_callback(onFileModified, FileSystemEvent.modify.rawValue)
             set_callback(onFileMovedFrom, 0x0040)
             set_callback(onFileMovedTo, 0x0080)
+            set_rename_callback(onFileRenamed)
 
             start_notifier()
         }
