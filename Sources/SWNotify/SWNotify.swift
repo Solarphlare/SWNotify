@@ -207,7 +207,7 @@ public class Notifier {
         return callbackIdentifier
     }
 
-    public func removeCallback(forUUID identifier: UUID) {
+    public func removeCallback(forCallbackId identifier: UUID) {
         self.createCallbacks.removeValue(forKey: identifier)
         self.deleteCallbacks.removeValue(forKey: identifier)
         self.modifyCallbacks.removeValue(forKey: identifier)
