@@ -2,7 +2,7 @@ import Foundation
 import CNotify
 
 public enum NotifierError: Error {
-    case noSuchFileOrDirectory
+    case noSuchDirectory
     case accessDenied
     case invalidTarget
     case failedToAddNotifier
@@ -98,7 +98,7 @@ public class Notifier {
         guard watchId >= 0 else {
             switch watchId {
             case -1:
-                throw NotifierError.noSuchFileOrDirectory
+                throw NotifierError.noSuchDirectory
             case -2:
                 throw NotifierError.accessDenied
             default:
@@ -170,7 +170,7 @@ public class Notifier {
         return callbackIdentifier
     }
 
-    /// Add a callback to be called when a file is moved.
+    /// Add a callback to be called when a file is moved from a watched directory.
     /// - Parameters:
     /// callback: The callback to be called when a file is moved from a watched directory. The callback takes the old path of the file as an argument.
     /// - Returns: A `UUID` that can be used to remove the callback.
