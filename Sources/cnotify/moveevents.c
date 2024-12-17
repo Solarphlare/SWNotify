@@ -30,6 +30,7 @@ int find_and_remove_event(uint32_t cookie, char* matched_name) {
                 tracked_events[j] = tracked_events[j + 1];
             }
 
+            tracked_count--;
             return 1;
         }
     }
