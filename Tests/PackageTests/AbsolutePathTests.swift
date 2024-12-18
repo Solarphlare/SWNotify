@@ -1,12 +1,13 @@
 import XCTest
 import SWNotify
 
-class PackageTests: XCTestCase {
+class AbsolutePathTests: XCTestCase {
     private let tempDirectory = FileManager.default.temporaryDirectory.path
     private let directoryPath = "\(FileManager.default.temporaryDirectory.path)/SWNotifyTestDirectory"
 
     override class func setUp() {
-        try! FileManager.default.createDirectory(atPath: "\(FileManager.default.temporaryDirectory.path)/SWNotifyTestDirectory", withIntermediateDirectories: false, attributes: nil)
+        try? FileManager.default.createDirectory(atPath: "\(FileManager.default.temporaryDirectory.path)/SWNotifyTestDirectory", withIntermediateDirectories: false, attributes: nil)
+        Notifier.default.includeFullPathsInEvents = true
     }
 
     override class func tearDown() {
@@ -17,18 +18,21 @@ class PackageTests: XCTestCase {
         try Notifier.default.addNotifier(for: directoryPath, events: [.create])
 
         let filePath = "\(directoryPath)/\(UUID().uuidString)"
+        let expectation = self.expectation(description: "File creation callback")
 
         Notifier.default.addOnFileCreateCallback { path in
             if path == filePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
-        let _ = FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil)
+        // Using data to write to a file instead of FileManager, because FileManager does not trigger the create event
+        try Data().write(to: URL(fileURLWithPath: filePath))
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File creation callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File creation callback was not called: \(error)")
+            }
         }
     }
 
@@ -36,20 +40,22 @@ class PackageTests: XCTestCase {
         try Notifier.default.addNotifier(for: directoryPath, events: [.delete])
 
         let filePath = "\(directoryPath)/\(UUID().uuidString)"
-
         let _ = FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil)
+
+        let expectation = self.expectation(description: "File deletion callback")
 
         Notifier.default.addOnFileDeleteCallback { path in
             if path == filePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
         try FileManager.default.removeItem(atPath: filePath)
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File deletion callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File deletion callback was not called: \(error)")
+            }
         }
     }
 
@@ -57,20 +63,22 @@ class PackageTests: XCTestCase {
         try Notifier.default.addNotifier(for: directoryPath, events: [.modify])
 
         let filePath = "\(directoryPath)/\(UUID().uuidString)"
-
         let _ = FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil)
+
+        let expectation = self.expectation(description: "File modification callback")
 
         Notifier.default.addOnFileModifyCallback { path in
             if path == filePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
         try "Hello world!".write(toFile: filePath, atomically: false, encoding: .utf8)
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File modification callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File modification callback was not called: \(error)")
+            }
         }
     }
 
@@ -78,34 +86,38 @@ class PackageTests: XCTestCase {
         try Notifier.default.addNotifier(for: directoryPath, events: [.moveFrom])
 
         let filePath = "\(directoryPath)/\(UUID().uuidString)"
-
         let _ = FileManager.default.createFile(atPath: filePath, contents: nil, attributes: nil)
+
+        let expectation = self.expectation(description: "File move from callback")
 
         Notifier.default.addOnFileMoveFromCallback { path in
             if path == filePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
         let newFilePath = "\(tempDirectory)/\(UUID().uuidString)"
         try FileManager.default.moveItem(atPath: filePath, toPath: newFilePath)
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File move from callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File move from callback was not called: \(error)")
+            }
         }
     }
 
     func testFileMoveTo() throws {
         try Notifier.default.addNotifier(for: directoryPath, events: [.moveTo])
-        let fileUUID = UUID().uuidString
 
+        let fileUUID = UUID().uuidString
         let initialCreationFilePath = "\(tempDirectory)/\(fileUUID)"
         let targetFilePath = "\(directoryPath)/\(fileUUID)"
 
+        let expectation = self.expectation(description: "File move to callback")
+
         Notifier.default.addOnFileMoveToCallback { path in
             if path == targetFilePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
@@ -113,35 +125,36 @@ class PackageTests: XCTestCase {
 
         try FileManager.default.moveItem(atPath: initialCreationFilePath, toPath: targetFilePath)
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File move to callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File move to callback was not called: \(error)")
+            }
         }
     }
 
     func testFileRename() throws {
-        let tempDirectory = FileManager.default.temporaryDirectory.path
-        let directoryPath = "\(tempDirectory)/SWNotifyTestDirectory"
-
         try Notifier.default.addNotifier(for: directoryPath, events: [.rename])
-        let fileUUID = UUID().uuidString
 
+        let fileUUID = UUID().uuidString
         let oldFilePath = "\(directoryPath)/\(fileUUID)"
         let newFilePath = "\(directoryPath)/\(UUID().uuidString)"
+
+        let expectation = self.expectation(description: "File rename callback")
 
         let _ = FileManager.default.createFile(atPath: oldFilePath, contents: nil, attributes: nil)
 
         Notifier.default.addOnFileRenameCallback { oldPath, newPath in
             if oldPath == oldFilePath && newPath == newFilePath {
-                XCTAssertTrue(true)
+                expectation.fulfill()
             }
         }
 
         try FileManager.default.moveItem(atPath: oldFilePath, toPath: newFilePath)
 
-        Task {
-            try await Task.sleep(nanoseconds: 5_000_000_000)
-            XCTFail("File rename callback was not called.")
+        waitForExpectations(timeout: 2) { error in
+            if let error = error {
+                XCTFail("File rename callback was not called: \(error)")
+            }
         }
     }
 }

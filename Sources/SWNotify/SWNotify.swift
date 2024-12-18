@@ -18,6 +18,12 @@ public enum FileSystemEvent: Int32 {
     case rename = 0x00C0
 }
 
+fileprivate func expandPath(_ path: String) -> String {
+    let expandedTildePath = NSString(string: path).expandingTildeInPath
+    let absolutePath = URL(fileURLWithPath: expandedTildePath).standardizedFileURL.path
+    return absolutePath
+}
+
 public class Notifier {
     private static let _default = Notifier()
     private var watches: [String: Int32] = [:]
@@ -30,35 +36,35 @@ public class Notifier {
     private var moveToCallbacks: [UUID : (String) -> Void] = [:]
     private var renameCallbacks: [UUID : (String, String) -> Void] = [:]
 
-
     private let onFileCreated: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-       let filepath = _default.watchesReversed[wd]! + "/" +  String(cString: filename!)
+       let filepath = (_default.includeFullPathsInEvents ? "\(expandPath(_default.watchesReversed[wd]!))/" : "") + String(cString: filename!)
         _default.createCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileDeleted: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let filepath = (_default.includeFullPathsInEvents ? "\(expandPath(_default.watchesReversed[wd]!))/" : "") + String(cString: filename!)
         _default.deleteCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileModified: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let filepath = (_default.includeFullPathsInEvents ? "\(expandPath(_default.watchesReversed[wd]!))/" : "") + String(cString: filename!)
         _default.modifyCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileMovedFrom: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let filepath = (_default.includeFullPathsInEvents ? "\(expandPath(_default.watchesReversed[wd]!))/" : "") + String(cString: filename!)
         _default.moveFromCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileMovedTo: @convention(c) (UnsafePointer<CChar>?, Int32) -> Void = { filename, wd in
-        let filepath = _default.watchesReversed[wd]! + "/" + String(cString: filename!)
+        let filepath = (_default.includeFullPathsInEvents ? "\(expandPath(_default.watchesReversed[wd]!))/" : "") + String(cString: filename!)
         _default.moveToCallbacks.values.forEach { $0(filepath) }
     }
 
     private let onFileRenamed: @convention(c) (UnsafePointer<CChar>?, UnsafePointer<CChar>?, Int32) -> Void = { oldFilename, newFilename, wd in
-        let oldFilepath = _default.watchesReversed[wd]! + "/" + String(cString: oldFilename!)
-        let newFilepath = _default.watchesReversed[wd]! + "/" + String(cString: newFilename!)
+        let fullPath = expandPath(_default.watchesReversed[wd]!)
+        let oldFilepath = (_default.includeFullPathsInEvents ? "\(fullPath)/" : "") + String(cString: oldFilename!)
+        let newFilepath = (_default.includeFullPathsInEvents ? "\(fullPath)/" : "") + String(cString: newFilename!)
         _default.renameCallbacks.values.forEach { $0(oldFilepath, newFilepath) }
     }
 
@@ -68,6 +74,9 @@ public class Notifier {
             return _default
         }
     }
+
+    /// Whether or not to include full paths in events. If false (the default value), only the filename will be included in events.
+    public var includeFullPathsInEvents = false;
 
     private init() {
         let result = notifier_init()
