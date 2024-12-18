@@ -90,7 +90,10 @@ public class Notifier {
     /// - Parameters:
     /// for: The path to watch for events.
     /// events: The events to watch for.
-    /// - Throws: NotifierError.failedToAddNotifier if the notifier could not be added.
+    /// - Throws:
+    /// `NotifierError.noSuchDirectory` if the path does not exist.
+    /// `NotifierError.accessDenied` if the path is not accessible.
+    /// `NotifierError.failedToAddNotifier` if the notifier could not be added.
     public func addNotifier(for path: String, events: [FileSystemEvent]) throws {
         let eventMask = events.reduce(0) { $0 | $1.rawValue }
         let watchId = add_watch(path, eventMask);
@@ -207,6 +210,8 @@ public class Notifier {
         return callbackIdentifier
     }
 
+    /// Remove a callback for a given identifier.
+    /// - Parameter identifier: The identifier of the callback to remove.
     public func removeCallback(forCallbackId identifier: UUID) {
         self.createCallbacks.removeValue(forKey: identifier)
         self.deleteCallbacks.removeValue(forKey: identifier)
