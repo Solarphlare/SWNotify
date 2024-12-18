@@ -7,7 +7,7 @@ class AbsolutePathTests: XCTestCase {
 
     override class func setUp() {
         try? FileManager.default.createDirectory(atPath: "\(FileManager.default.temporaryDirectory.path)/SWNotifyTestDirectory", withIntermediateDirectories: false, attributes: nil)
-        Notifier.default.includeFullPathsInEvents = true
+        Notifier.default.includeAbsolutePathsInEvents = true
     }
 
     override class func tearDown() {
