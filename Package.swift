@@ -23,6 +23,10 @@ let package = Package(
         .target(
             name: "SWNotify",
             dependencies: ["CNotify"]
+        ),
+        .testTarget(
+            name: "PackageTests",
+            dependencies: ["SWNotify"]
         )
     ],
     swiftLanguageModes: [.v5],

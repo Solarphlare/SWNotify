@@ -1,0 +1,38 @@
+name: "Test Package"
+on:
+    push:
+        paths:
+            - '**.c'
+            - '**.h'
+            - '**.swift'
+    workflow_dispatch:
+    pull_request_target:
+        paths:
+            - '**.c'
+            - '**.h'
+            - '**.swift'
+
+
+jobs:
+    test:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - name: Set up Swift
+              run: |
+                gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys '52BB 7E3D E28A 71BE 22EC  05FF EF80 A866 B47A 981F'
+                curl https://download.swift.org/swift-6.0.3-release/ubuntu2404/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-ubuntu24.04.tar.gz.sig -o swift-6.0.3-RELEASE-ubuntu24.04.tar.gz.sig
+                curl https://download.swift.org/swift-6.0.3-release/ubuntu2404/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-ubuntu24.04.tar.gz -o swift-6.0.3-RELEASE-ubuntu24.04.tar.gz
+                gpg --verify swift-6.0.3-RELEASE-ubuntu24.04.tar.gz.sig
+                if [ $? -eq 0 ]; then
+                    tar -xzf swift-6.0.3-RELEASE-ubuntu24.04.tar.gz
+                    echo "$(pwd)/swift-6.0.3-RELEASE-ubuntu24.04/usr/bin" >> $GITHUB_PATH
+                else
+                    echo "Failed to verify integrity of Swift tarball"
+                    exit 1
+                fi
+            - name: Build
+              run: swift build
+            - name: Test
+              run: swift test
+
