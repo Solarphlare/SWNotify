@@ -27,6 +27,7 @@ int find_and_remove_event(uint32_t cookie, char* matched_name) {
                 strncpy(matched_name, tracked_events[i].name, 1024);
             }
 
+            // Remove the event by shifting all events after it back by one
             for (int j = i; j < tracked_count - 1; j++) {
                 tracked_events[j] = tracked_events[j + 1];
             }

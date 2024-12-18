@@ -40,11 +40,11 @@ int add_watch(const char* filepath, int flags) {
 
     if (watch < 0) {
         switch (errno) {
-            case ENOENT:
+            case ENOENT: // Directory doesn't exist
                 return -1;
-            case EACCES:
+            case EACCES: // Permission denied
                 return -2;
-            default:
+            default: // No idea what happened, but it isn't good.
                 return -3;
         }
     }
@@ -80,6 +80,7 @@ int set_callback(void (*callback)(const char*, int), int flag) {
     return 0;
 }
 
+// Separate function for rename callback because it has a different signature
 int set_rename_callback(void (*callback)(const char*, const char*, int)) {
     callbacks.rename = callback;
     return 0;
@@ -96,12 +97,15 @@ static void* handle_events(void* _vargp) {
     fds[0].events = POLLIN;
 
     while (1) {
-        int ret = poll(fds, 1, 250);
+        int ret = poll(fds, 1, 250); // 1 descriptor, 250ms timeout
 
+        // Something went wrong with poll
         if (ret < 0) {
             break;
         }
 
+        // Check for, dispatch, and remove any IN_MOVE_FROM events that need to be dispatched to Swift
+        // An event will be dispatched if it has been in tracked_events for more than 500ms
         if (tracked_count > 0) {
             long long now = get_current_time_millis();
 
@@ -113,6 +117,7 @@ static void* handle_events(void* _vargp) {
             }
         }
 
+        // No events to read, poll again
         if (ret == 0) {
             continue;
         }
@@ -136,16 +141,17 @@ static void* handle_events(void* _vargp) {
                 callbacks.modify(event->name, event->wd);
             }
             else if (event->mask & IN_MOVED_FROM) {
+                // Track the event so we can dispatch it later
                 track_event(event->wd, event->cookie, event->name);
             }
             else if (event->mask & IN_MOVED_TO) {
                 char matched_name[1024];
-                if (find_and_remove_event(event->cookie, matched_name)) {
+                if (find_and_remove_event(event->cookie, matched_name)) { // Check if this is a rename event - if it is, dispatch it
                     if (callbacks.rename) {
                         callbacks.rename(matched_name, event->name, event->wd);
                     }
                 }
-                else if (callbacks.move_to) {
+                else if (callbacks.move_to) { // Otherwise, it's an IN_MOVE_TO event - dispatch it
                     callbacks.move_to(event->name, event->wd);
                 }
             }
