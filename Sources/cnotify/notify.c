@@ -4,10 +4,10 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/poll.h>
-#include "include/util.h"
-#include "include/notify.h"
-#include "include/types.h"
-#include "include/moveevents.h"
+#include "util.h"
+#include "notify.h"
+#include "types.h"
+#include "moveevents.h"
 
 struct callback_collection callbacks = {
     NULL,
