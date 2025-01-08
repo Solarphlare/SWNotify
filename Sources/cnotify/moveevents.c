@@ -4,7 +4,7 @@
 #include <string.h>
 #include <time.h>
 
-struct move_event tracked_events[sizeof(struct move_event) * MAX_TRACKED_EVENTS] = {};
+struct move_event tracked_events[MAX_TRACKED_EVENTS] = {};
 int tracked_count = 0;
 
 void track_event(uint32_t wd, uint32_t cookie, const char* name) {
