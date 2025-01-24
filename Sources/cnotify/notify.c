@@ -109,13 +109,18 @@ static void* handle_events(void* _vargp) {
         if (tracked_count > 0) {
             long long now = get_current_time_millis();
 
-            for (int i = 0; i < tracked_count; i++) {
-                if (now - tracked_events[i].timestamp > 500 && callbacks.move_from) {
-                    callbacks.move_from(tracked_events[i].name, tracked_events[i].wd);
-                    find_and_remove_event(tracked_events[i].cookie, NULL);
-                }
+            for (int i = 0; i < MAX_TRACKED_EVENTS; i++) {
+                if (tracked_events[i].data == NULL) continue; // List is empty
+
+                do {
+                    if (now - tracked_events[i].data->timestamp > 500 && callbacks.move_from) {
+                        callbacks.move_from(tracked_events[i].data->name, tracked_events[i].data->wd);
+                        find_and_remove_event(tracked_events[i].data->cookie, NULL);
+                    }
+                } while (tracked_events[i].next != NULL);
             }
         }
+
 
         // No events to read, poll again
         if (ret == 0) {

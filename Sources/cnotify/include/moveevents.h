@@ -2,9 +2,9 @@
 #include <stdint.h>
 #include "types.h"
 
-#define MAX_TRACKED_EVENTS 512
+#define MAX_TRACKED_EVENTS 4096
 
-extern struct move_event tracked_events[MAX_TRACKED_EVENTS];
+extern struct node tracked_events[MAX_TRACKED_EVENTS];
 extern int tracked_count;
 
 void track_event(uint32_t wd, uint32_t cookie, const char* name);
