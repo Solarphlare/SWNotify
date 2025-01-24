@@ -16,6 +16,8 @@ void track_event(uint32_t wd, uint32_t cookie, const char* name) {
     event->cookie = cookie;
     event->wd = wd;
     strncpy(event->name, name, sizeof(event->name));
+    event->name[sizeof(event->name) - 1] = '\0'; // Ensure null-termination
+
     event->timestamp = get_current_time_millis();
     tracked_count++;
 }
@@ -25,6 +27,7 @@ int find_and_remove_event(uint32_t cookie, char* matched_name) {
         if (tracked_events[i].cookie == cookie) {
             if (matched_name != NULL) {
                 strncpy(matched_name, tracked_events[i].name, 1024);
+                matched_name[1023] = '\0'; // Ensure null-termination
             }
 
             // Remove the event by shifting all events after it back by one
