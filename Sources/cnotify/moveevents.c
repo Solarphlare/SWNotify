@@ -49,8 +49,8 @@ int find_and_remove_event(uint32_t cookie, char* matched_name) {
     for (struct node* node = head; node != NULL; node = node->next) {
         if (node->data->cookie == cookie) {
             if (matched_name != NULL) {
-                strncpy(matched_name, node->data->name, sizeof(node->data->name));
-                matched_name[sizeof(node->data->name) - 1] = '\0';
+                strncpy(matched_name, node->data->name, 1024);
+                matched_name[1023] = '\0';
             }
 
             remove_event(node);
