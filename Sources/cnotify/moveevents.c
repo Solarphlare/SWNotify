@@ -5,96 +5,85 @@
 #include <stdint.h>
 #include <string.h>
 
-struct node tracked_events[MAX_TRACKED_EVENTS] = {};
 int tracked_count = 0;
 
+struct node* head = NULL;
+struct node* tail = NULL;
+
 void track_event(uint32_t wd, uint32_t cookie, const char* name) {
-    const int index = cookie % MAX_TRACKED_EVENTS;
-
-    if (tracked_events[index].data == NULL) { // slot is empty
-        tracked_events[index].data = (struct move_event*) malloc(sizeof(struct move_event));
-        tracked_events[index].next = NULL;
-        struct move_event* event = tracked_events[index].data;
-
-        event->wd = wd;
-        event->cookie = cookie;
-        event->timestamp = get_current_time_millis();
-        strncpy(event->name, name, sizeof(event->name));
-        event->name[sizeof(event->name) - 1] = '\0';
+    struct node* new_node = (struct node*) malloc(sizeof(struct node));
+    if (new_node == NULL) {
+        return;
     }
-    else { // slot is not empty. traverse the linked list until we find one
-        struct node* node = &tracked_events[index];
-        while (node->next != NULL) {
-            node = node->next;
-        }
 
-        node->next = malloc(sizeof(struct node));
-        node->next->data = malloc(sizeof(struct move_event));
-        node->next->next = NULL;
-        struct move_event* event = node->next->data;
+    struct move_event* new_event = (struct move_event*) malloc(sizeof(struct move_event));
+    if (new_event == NULL) {
+        free(new_node);
+        return;
+    }
 
-        event->wd = wd;
-        event->cookie = cookie;
-        event->timestamp = get_current_time_millis();
-        strncpy(event->name, name, sizeof(event->name) - 1);
-        event->name[sizeof(event->name) - 1] = '\0';
+    new_node->data = new_event;
+    new_event->wd = wd;
+    new_event->cookie = cookie;
+    new_event->timestamp = get_current_time_millis();
+    strncpy(new_event->name, name, sizeof(new_event->name) - 1);
+    new_event->name[sizeof(new_event->name) - 1] = '\0';
+
+    if (head == NULL) {
+        head = new_node;
+        tail = new_node;
+        new_node->next = NULL;
+        new_node->prev = NULL;
+    }
+    else {
+        tail->next = new_node;
+        new_node->prev = tail;
+        new_node->next = NULL;
+        tail = new_node;
     }
 
     tracked_count++;
 }
 
 int find_and_remove_event(uint32_t cookie, char* matched_name) {
-    const int index = cookie % MAX_TRACKED_EVENTS;
-    struct node* node = &tracked_events[index];
-    struct node* previous_node = NULL;
+    for (struct node* node = head; node != NULL; node = node->next) {
+        if (node->data->cookie == cookie) {
+            if (matched_name != NULL) {
+                strncpy(matched_name, node->data->name, sizeof(node->data->name));
+                matched_name[sizeof(node->data->name) - 1] = '\0';
+            }
 
-    if (node->data == NULL) {
-        return 0;
-    }
-
-    while (node->data->cookie != cookie) {
-        if (node->next == NULL) {
-            return 0;
+            remove_event(node);
+            return 1;
         }
-
-        previous_node = node;
-        node = node->next;
     }
 
-    if (matched_name != NULL) {
-        strncpy(matched_name, node->data->name, 1024);
-        matched_name[1023] = '\0';
+    return 0;
+}
+
+void remove_event(struct node* node) {
+    if (node == NULL) return;
+
+    if (node->prev == NULL) { // head
+        head = node->next;
+
+        if (head != NULL) {
+            head->prev = NULL;
+        }
+        else {
+            head = NULL;
+            tail = NULL;
+        }
+    }
+    else if (node->next == NULL) { // tail
+        node->prev->next = NULL;
+    }
+    else { // middle
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
     }
 
     free(node->data);
-    node->data = NULL;
-
-    if (previous_node != NULL) {
-        if (node->next == NULL) {
-            previous_node->next = NULL;
-        }
-        else {
-            previous_node->next = node->next;
-        }
-
-        free(node);
-    }
-    else {
-        // if this is the only node in the list
-        if (node->next == NULL) {
-            free(node->data);
-            node->data = NULL;
-        }
-        else { // copy the next node's contents into the head
-            struct node* temp = node->next;
-
-            node->data = temp->data;
-            node->next = temp->next;
-
-            free(temp);
-        }
-    }
-
+    free(node);
     tracked_count--;
-    return 1;
 }

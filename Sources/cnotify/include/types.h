@@ -23,4 +23,5 @@ struct move_event {
 struct node {
     struct move_event* data;
     struct node* next;
+    struct node* prev;
 };
