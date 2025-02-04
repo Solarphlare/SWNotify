@@ -28,7 +28,8 @@ try Notifier.default.addNotifier(for: "/some/path", events: [.create, .rename, .
 // Monitor for file creation events at ProcessWorkingDirectory/some/other/path
 try Notifier.default.addNotifier(for: "some/other/path", events: [.create])
 ```
-Please note that any directory you specify must actually exist at the time of program execution, otherwise `NotifierError.noSuchDirectory` will be thrown by the `addNotifer` call.
+> [!NOTE]
+> Any path you pass to an `addNotifer` call must actually exist at the time of the call, otherwise `NotifierError.noSuchDirectory` will be thrown by the `addNotifer` call.
 
 Next, register callbacks to be called for specific events. You can register multiple callbacks for each event.
 ```swift
