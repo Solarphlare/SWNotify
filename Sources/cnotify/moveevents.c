@@ -26,8 +26,8 @@ void track_event(uint32_t wd, uint32_t cookie, const char* name) {
     new_event->wd = wd;
     new_event->cookie = cookie;
     new_event->timestamp = get_current_time_millis();
-    strncpy(new_event->name, name, sizeof(new_event->name) - 1);
-    new_event->name[sizeof(new_event->name) - 1] = '\0';
+    strncpy(new_event->name, name, 1024);
+    new_event->name[1023] = '\0';
 
     if (head == NULL) {
         head = new_node;
