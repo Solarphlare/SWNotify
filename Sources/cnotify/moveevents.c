@@ -1,9 +1,9 @@
-#include "moveevents.h"
-#include "types.h"
-#include "util.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include "moveevents.h"
+#include "types.h"
+#include "util.h"
 
 int tracked_count = 0;
 
@@ -26,8 +26,7 @@ void track_event(uint32_t wd, uint32_t cookie, const char* name) {
     new_event->wd = wd;
     new_event->cookie = cookie;
     new_event->timestamp = get_current_time_millis();
-    strncpy(new_event->name, name, 1024);
-    new_event->name[1023] = '\0';
+    terminated_strncpy(new_event->name, name, 1024);
 
     if (head == NULL) {
         head = new_node;
@@ -49,8 +48,7 @@ int find_and_remove_event(uint32_t cookie, char* matched_name) {
     for (struct node* node = head; node != NULL; node = node->next) {
         if (node->data->cookie == cookie) {
             if (matched_name != NULL) {
-                strncpy(matched_name, node->data->name, 1024);
-                matched_name[1023] = '\0';
+                terminated_strncpy(matched_name, node->data->name, 1024);
             }
 
             remove_event(node);
