@@ -8,7 +8,7 @@ Watch for file system events in directories in Swift on Linux.
 - Apple platforms — this package won't work on Apple platforms due to its use of the `inotify` API. If developing for macOS, please use the [FSEvents](https://developer.apple.com/documentation/coreservices/file_system_events) API in CoreServices instead.
 
 ## Requirements
-- Swift 5 or newer
+- Swift 5.4 or newer
 - A C compiler (you probably have one if you're writing Swift)
 
 ## Installation
