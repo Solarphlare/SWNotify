@@ -16,6 +16,8 @@ on:
 jobs:
     test:
         runs-on: ubuntu-24.04
+        env:
+          ASAN_OPTIONS: detect_leaks=0
         steps:
             - uses: actions/checkout@v4
             - name: Set up Swift
@@ -34,5 +36,4 @@ jobs:
             - name: Build
               run: swift build
             - name: Test
-              run: swift test
-
+              run: swift test --sanitize=address

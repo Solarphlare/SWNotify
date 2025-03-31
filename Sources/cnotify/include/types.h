@@ -18,3 +18,10 @@ struct move_event {
     long long timestamp;
     uint32_t wd;
 };
+
+
+struct node {
+    struct move_event* data;
+    struct node* next;
+    struct node* prev;
+};

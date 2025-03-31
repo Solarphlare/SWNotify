@@ -1,44 +1,87 @@
-#include "moveevents.h"
-#include "util.h"
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
+#include "moveevents.h"
+#include "types.h"
+#include "util.h"
 
-struct move_event tracked_events[MAX_TRACKED_EVENTS] = {};
 int tracked_count = 0;
 
+struct node* head = NULL;
+struct node* tail = NULL;
+
 void track_event(uint32_t wd, uint32_t cookie, const char* name) {
-    if (tracked_count >= MAX_TRACKED_EVENTS) {
+    struct node* new_node = (struct node*) malloc(sizeof(struct node));
+    if (new_node == NULL) {
         return;
     }
 
-    struct move_event* event = &tracked_events[tracked_count];
-    event->cookie = cookie;
-    event->wd = wd;
-    strncpy(event->name, name, sizeof(event->name));
-    event->name[sizeof(event->name) - 1] = '\0'; // Ensure null-termination
+    struct move_event* new_event = (struct move_event*) malloc(sizeof(struct move_event));
+    if (new_event == NULL) {
+        free(new_node);
+        return;
+    }
 
-    event->timestamp = get_current_time_millis();
+    new_node->data = new_event;
+    new_event->wd = wd;
+    new_event->cookie = cookie;
+    new_event->timestamp = get_current_time_millis();
+    terminated_strncpy(new_event->name, name, 1024);
+
+    if (head == NULL) {
+        head = new_node;
+        tail = new_node;
+        new_node->next = NULL;
+        new_node->prev = NULL;
+    }
+    else {
+        tail->next = new_node;
+        new_node->prev = tail;
+        new_node->next = NULL;
+        tail = new_node;
+    }
+
     tracked_count++;
 }
 
 int find_and_remove_event(uint32_t cookie, char* matched_name) {
-    for (int i = 0; i < tracked_count; i++) {
-        if (tracked_events[i].cookie == cookie) {
+    for (struct node* node = head; node != NULL; node = node->next) {
+        if (node->data->cookie == cookie) {
             if (matched_name != NULL) {
-                strncpy(matched_name, tracked_events[i].name, 1024);
-                matched_name[1023] = '\0'; // Ensure null-termination
+                terminated_strncpy(matched_name, node->data->name, 1024);
             }
 
-            // Remove the event by shifting all events after it back by one
-            for (int j = i; j < tracked_count - 1; j++) {
-                tracked_events[j] = tracked_events[j + 1];
-            }
-
-            tracked_count--;
+            remove_event(node);
             return 1;
         }
     }
 
     return 0;
+}
+
+void remove_event(struct node* node) {
+    if (node == NULL) return;
+
+    if (node->prev == NULL) { // head
+        head = node->next;
+
+        if (head != NULL) {
+            head->prev = NULL;
+        }
+        else {
+            head = NULL;
+            tail = NULL;
+        }
+    }
+    else if (node->next == NULL) { // tail
+        node->prev->next = NULL;
+    }
+    else { // middle
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+    }
+
+    free(node->data);
+    free(node);
+    tracked_count--;
 }

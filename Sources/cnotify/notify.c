@@ -87,8 +87,6 @@ int set_rename_callback(void (*callback)(const char*, const char*, int)) {
 }
 
 static void* handle_events(void* _vargp) {
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
     char buf[4096];
     ssize_t length;
     struct pollfd fds[1];
@@ -109,10 +107,18 @@ static void* handle_events(void* _vargp) {
         if (tracked_count > 0) {
             long long now = get_current_time_millis();
 
-            for (int i = 0; i < tracked_count; i++) {
-                if (now - tracked_events[i].timestamp > 500 && callbacks.move_from) {
-                    callbacks.move_from(tracked_events[i].name, tracked_events[i].wd);
-                    find_and_remove_event(tracked_events[i].cookie, NULL);
+            for (struct node* node = head; node != NULL;) {
+                if ((now - node->data->timestamp) > 500) {
+                    if (callbacks.move_from) {
+                        callbacks.move_from(node->data->name, node->data->wd);
+                    }
+
+                    struct node* temp = node;
+                    node = node->next;
+                    remove_event(temp);
+                }
+                else {
+                    node = node->next;
                 }
             }
         }
