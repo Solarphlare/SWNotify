@@ -87,8 +87,6 @@ int set_rename_callback(void (*callback)(const char*, const char*, int)) {
 }
 
 static void* handle_events(void* _vargp) {
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
     char buf[4096];
     ssize_t length;
     struct pollfd fds[1];
