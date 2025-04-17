@@ -1,3 +1,4 @@
+#if os(Linux)
 import Foundation
 import CNotify
 
@@ -230,3 +231,4 @@ public class Notifier {
         self.renameCallbacks.removeValue(forKey: identifier)
     }
 }
+#endif
