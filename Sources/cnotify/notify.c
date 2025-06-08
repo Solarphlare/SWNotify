@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/inotify.h>
+#include <string.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
@@ -99,7 +101,8 @@ static void* handle_events(void* _vargp) {
 
         // Something went wrong with poll
         if (ret < 0) {
-            break;
+            fprintf(stderr, "[SWNotify] Error when polling descriptor: %s\n", strerror(errno));
+            continue;
         }
 
         // Check for, dispatch, and remove any IN_MOVE_FROM events that need to be dispatched to Swift
