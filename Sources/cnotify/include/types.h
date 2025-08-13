@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "uthash.h"
 
 struct callback_collection {
     // const char* name, int wd
@@ -17,11 +18,5 @@ struct move_event {
     char name[1024];
     long long timestamp;
     uint32_t wd;
-};
-
-
-struct node {
-    struct move_event* data;
-    struct node* next;
-    struct node* prev;
+    UT_hash_handle hh;
 };

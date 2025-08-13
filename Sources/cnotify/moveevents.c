@@ -4,84 +4,46 @@
 #include "moveevents.h"
 #include "types.h"
 #include "util.h"
+#include "uthash.h"
 
 int tracked_count = 0;
-
-struct node* head = NULL;
-struct node* tail = NULL;
+struct move_event* move_events = NULL;
 
 void track_event(uint32_t wd, uint32_t cookie, const char* name) {
-    struct node* new_node = (struct node*) malloc(sizeof(struct node));
-    if (new_node == NULL) {
-        return;
-    }
-
     struct move_event* new_event = (struct move_event*) malloc(sizeof(struct move_event));
     if (new_event == NULL) {
-        free(new_node);
         return;
     }
 
-    new_node->data = new_event;
     new_event->wd = wd;
     new_event->cookie = cookie;
     new_event->timestamp = get_current_time_millis();
     terminated_strncpy(new_event->name, name, 1024);
 
-    if (head == NULL) {
-        head = new_node;
-        tail = new_node;
-        new_node->next = NULL;
-        new_node->prev = NULL;
-    }
-    else {
-        tail->next = new_node;
-        new_node->prev = tail;
-        new_node->next = NULL;
-        tail = new_node;
-    }
-
+    HASH_ADD_INT(move_events, cookie, new_event);
     tracked_count++;
 }
 
 int find_and_remove_event(uint32_t cookie, char* matched_name) {
-    for (struct node* node = head; node != NULL; node = node->next) {
-        if (node->data->cookie == cookie) {
-            if (matched_name != NULL) {
-                terminated_strncpy(matched_name, node->data->name, 1024);
-            }
+    struct move_event* found_event;
+    HASH_FIND_INT(move_events, &cookie, found_event);
 
-            remove_event(node);
-            return 1;
+    if (found_event) {
+        if (matched_name != NULL) {
+            terminated_strncpy(matched_name, found_event->name, 1024);
         }
+
+        remove_event(found_event);
+        return 1;
     }
 
     return 0;
 }
 
-void remove_event(struct node* node) {
-    if (node == NULL) return;
-
-    if (node->prev == NULL) { // head
-        head = node->next;
-
-        if (head != NULL) {
-            head->prev = NULL;
-        }
-        else {
-            head = NULL;
-            tail = NULL;
-        }
+void remove_event(struct move_event* event) {
+    if (event) {
+        HASH_DEL(move_events, event);
+        free(event);
+        tracked_count--;
     }
-    else if (node->next == NULL) { // tail
-        node->prev->next = NULL;
-    }
-    else { // middle
-        node->prev->next = node->next;
-        node->next->prev = node->prev;
-    }
-
-    free(node->data);
-    free(node);
-    tracked_count--;
 }

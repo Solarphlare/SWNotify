@@ -110,18 +110,18 @@ static void* handle_events(void* _vargp) {
         if (tracked_count > 0) {
             long long now = get_current_time_millis();
 
-            for (struct node* node = head; node != NULL;) {
-                if ((now - node->data->timestamp) > 500) {
+            for (struct move_event* current = move_events; current != NULL;) {
+                if (now - current->timestamp > 500) {
                     if (callbacks.move_from) {
-                        callbacks.move_from(node->data->name, node->data->wd);
+                        callbacks.move_from(current->name, current->wd);
                     }
 
-                    struct node* temp = node;
-                    node = node->next;
-                    remove_event(temp);
+                    struct move_event* tmp = current;
+                    current = current->hh.next;
+                    remove_event(tmp);
                 }
                 else {
-                    node = node->next;
+                    current = current->hh.next;
                 }
             }
         }
