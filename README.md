@@ -15,7 +15,7 @@ Watch for file system events in directories in Swift on Linux.
 Add the following to your Package.swift:
 ```swift
 dependencies: [
-    .package(url: "https://github.com/CominAtYou/SWNotify", from: "1.0.0")
+    .package(url: "https://github.com/CominAtYou/SWNotify", from: "1.2.1")
 ]
 ```
 
