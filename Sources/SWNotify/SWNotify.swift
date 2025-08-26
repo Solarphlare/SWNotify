@@ -103,8 +103,16 @@ public class Notifier {
     /// `NotifierError.noSuchDirectory` if the path does not exist.
     /// `NotifierError.accessDenied` if the path is not accessible.
     /// `NotifierError.failedToAddNotifier` if the notifier could not be added.
-    public func addNotifier(for path: String, events: [FileSystemEvent]) throws {
+    public func addNotifier(for path: String, events: Set<FileSystemEvent>) throws {
         let eventMask = events.reduce(0) { $0 | $1.rawValue }
+
+        var isDirectory = false
+        let _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+
+        if (!isDirectory) {
+            throw NotifierError.invalidTarget
+        }
+
         let watchId = add_watch(path, eventMask);
 
         guard watchId >= 0 else {
@@ -120,13 +128,6 @@ public class Notifier {
 
         self.watches[path] = watchId
         self.watchesReversed[watchId] = path
-
-        var isDirectory = false
-        let _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
-
-        if (!isDirectory) {
-            throw NotifierError.invalidTarget
-        }
     }
 
     /// Remove a notifier for a given path.
