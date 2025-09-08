@@ -107,7 +107,7 @@ public class Notifier {
         let eventMask = events.reduce(0) { $0 | $1.rawValue }
 
         var isDirectory = false
-        let _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+        _ = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
 
         if (!isDirectory) {
             throw NotifierError.invalidTarget
